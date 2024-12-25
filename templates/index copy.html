@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OBOT Holder Rank</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="icon" type="image/x-icon" href="/static/images/logo.ico">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" />
+
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            height: 100%;
+            font-family: 'Poppins', sans-serif;
+            overflow: hidden;
+        }
+
+        body {
+            background: linear-gradient(120deg, #8e44ad, #3498db, #2ecc71);
+            background-size: 300% 300%;
+            animation: gradientBG 15s ease infinite;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+
+        @keyframes gradientBG {
+            0% {
+                background-position: 0% 50%;
+            }
+
+            50% {
+                background-position: 100% 50%;
+            }
+
+            100% {
+                background-position: 0% 50%;
+            }
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 30px;
+            border-radius: 14px;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+            max-width: 450px;
+            width: 90%;
+            text-align: center;
+            animation: fadeInUp 1s ease forwards;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        h1 {
+            font-size: 26px;
+            margin-bottom: 25px;
+            color: #333;
+            font-weight: 700;
+        }
+
+        input,
+        button {
+            width: 100%;
+            padding: 14px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border: none;
+            font-size: 16px;
+            font-family: inherit;
+            outline: none;
+            transition: 0.3s ease;
+        }
+
+        input {
+            background-color: #f2f2f2;
+            border: 1px solid #ddd;
+            font-weight: 400;
+        }
+
+        button {
+            background: linear-gradient(135deg, #16a085, #27ae60);
+            color: #fff;
+            font-weight: 600;
+            cursor: pointer;
+            position: relative;
+        }
+
+        button:hover {
+            background: linear-gradient(135deg, #1abc9c, #2ecc71);
+        }
+
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+
+        .result {
+            margin-top: 20px;
+            color: #333;
+            font-size: 16px;
+        }
+
+        .image-container {
+            margin-top: 20px;
+        }
+
+        .image-container img {
+            max-width: 120px;
+            display: block;
+            margin: 0 auto;
+            animation: floatImage 2.5s ease-in-out infinite;
+        }
+
+        .threshold-info {
+            margin-top: 10px;
+            font-size: 14px;
+            color: #555;
+        }
+
+        .threshold-info span {
+            font-weight: bold;
+            color: #007bff;
+        }
+
+        @keyframes floatImage {
+            0% {
+                transform: translateY(0px);
+            }
+
+            50% {
+                transform: translateY(-8px);
+            }
+
+            100% {
+                transform: translateY(0px);
+            }
+        }
+
+        .airdrop-info {
+            margin-top: 25px;
+            font-size: 14px;
+            color: #555;
+            line-height: 1.6;
+        }
+
+        .airdrop-info strong {
+            color: #2ecc71;
+            font-weight: 600;
+        }
+
+        @media (max-width: 480px) {
+            h1 {
+                font-size: 22px;
+            }
+
+            .container {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Check Your Token Holder Rank</h1>
+
+        <input type="text" id="walletAddress" placeholder="Enter Your Solana Wallet Address" />
+
+        <button id="checkRankButton" onclick="checkRank()">Check Rank</button>
+
+        <div class="result" id="result"></div>
+
+        <div class="image-container" id="image-container"></div>
+
+        <p class="airdrop-info">
+            The top <strong>1360 users</strong> will receive a <strong>$OSOL100</strong> airdrop
+            based on the amount of <strong>OBOT</strong> they hold
+            (the more they hold, the larger the airdrop).
+        </p>
+        <p class="threshold-info">
+            <strong>Minimum balance to be in top 1360:</strong>
+            <span id="minBalanceText">Loading...</span> <strong>OBOT</strong>
+        </p>
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            fetch("/get-1360th-balance")
+                .then(response => response.json())
+                .then(data => {
+                    if (data.message === "Success") {
+                        document.getElementById("minBalanceText").textContent = data.balance;
+                    } else {
+                        document.getElementById("minBalanceText").textContent = data.message || "Error";
+                    }
+                })
+                .catch(err => {
+                    document.getElementById("minBalanceText").textContent = "Error fetching data";
+                    console.error(err);
+                });
+        });
+
+        let confettiInterval;
+        let animationEnd;
+
+        function isValidSolanaAddress(address) {
+            // Solana cüzdanları genelde 32-44 karakter arası base58
+            // (Regex yaklaşımı):
+            const base58Regex = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+            return base58Regex.test(address.trim());
+        }
+
+        function isValidAptosAddress(address) {
+            // Basit kontrol: "0x" ile başlıyor ve 66 karakter (0x + 64 hex)  
+            // Veya Aptos’taki tam uzunluk (0x + 64 hex = 66).  
+            // Değerler 0x + 64 hex karakter (bunlar 0-9A-Fa-f)  
+            const aptosRegex = /^0x[a-fA-F0-9]{64}$/;
+            return aptosRegex.test(address.trim());
+        }
+        function isValidWalletAddress(address) {
+            const trimmed = address.trim();
+            // Aptos veya Solana valid ise "true" dön
+            return isValidSolanaAddress(trimmed) || isValidAptosAddress(trimmed);
+        }
+
+        async function checkRank() {
+            const walletInput = document.getElementById('walletAddress');
+            const checkRankButton = document.getElementById('checkRankButton');
+            const walletAddress = walletInput.value.trim();
+
+            const resultDiv = document.getElementById('result');
+            const imageContainer = document.getElementById('image-container');
+            resultDiv.textContent = "Checking...";
+            resultDiv.style.color = "black";
+            imageContainer.innerHTML = "";
+
+            checkRankButton.disabled = true;
+
+            if (!isValidWalletAddress(walletAddress)) {
+                resultDiv.textContent = "Invalid wallet address. Please enter a Solana or Aptos wallet address.";
+                resultDiv.style.color = "red";
+                setTimeout(() => {
+                    checkRankButton.disabled = false;
+                }, 2000);
+                return;
+            }
+
+            stopConfetti();
+
+            try {
+                const response = await fetch('/check-rank', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ wallet_address: walletAddress }),
+                });
+
+                const data = await response.json();
+                if (response.ok) {
+                    resultDiv.innerHTML = `
+            <p>Your rank: <strong>${data.rank}</strong></p>
+            <p>Your balance: <strong>${data.balance}</strong></p>
+          `;
+
+                    let imageSrc = "";
+                    if (data.rank <= 500) {
+                        imageSrc = "/static/images/whale.png";
+                    } else if (data.rank > 500 && data.rank <= 1000) {
+                        imageSrc = "/static/images/octopus.png";
+                    } else if (data.rank > 1000 && data.rank <= 1500) {
+                        imageSrc = "/static/images/shrimp.png";
+                    } else {
+                        imageSrc = "/static/images/fish.png";
+                    }
+
+                    imageContainer.innerHTML = `<img src="${imageSrc}" alt="Rank Image">`;
+
+                            if (data.rank <= 1360) {
+                                startConfettiEffect();
+                                resultDiv.innerHTML += `
+                      <p style="
+                          color: green; 
+                          font-size: 18px; 
+                          font-weight: bold; 
+                          margin-top: 20px;">
+                        YOU ARE ELIGIBLE FOR $OSOL100 AIRDROP
+                      </p>
+                    `;
+                            }
+                } else {
+                    resultDiv.innerHTML = `<p style="color: red;">Error: ${data.message || "An error occurred"}</p>`;
+                }
+            } catch (error) {
+                resultDiv.textContent = "Error fetching rank. Please try again.";
+            } finally {
+                setTimeout(() => {
+                    checkRankButton.disabled = false;
+                }, 2000);
+            }
+        }
+
+        function startConfettiEffect() {
+            const duration = 2 * 1000;
+            animationEnd = Date.now() + duration;
+
+            const defaults = {
+                startVelocity: 30,
+                spread: 360,
+                ticks: 60,
+                zIndex: 9999
+            };
+
+            function randomInRange(min, max) {
+                return Math.random() * (max - min) + min;
+            }
+
+            confettiInterval = setInterval(() => {
+                const timeLeft = animationEnd - Date.now();
+
+                if (timeLeft <= 0) {
+                    return stopConfetti();
+                }
+
+                const particleCount = 300 * (timeLeft / duration);
+
+                confetti(
+                    Object.assign({}, defaults, {
+                        particleCount,
+                        origin: {
+                            x: randomInRange(0.1, 0.3),
+                            y: Math.random() - 0.2
+                        }
+                    })
+                );
+                confetti(
+                    Object.assign({}, defaults, {
+                        particleCount,
+                        origin: {
+                            x: randomInRange(0.7, 0.9),
+                            y: Math.random() - 0.2
+                        }
+                    })
+                );
+            }, 250);
+        }
+
+        function stopConfetti() {
+            if (confettiInterval) {
+                clearInterval(confettiInterval);
+                confettiInterval = null;
+            }
+        }
+    </script>
+</body>
+
+</html>
